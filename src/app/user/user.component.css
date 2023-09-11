@@ -1,0 +1,12 @@
+.box-image {
+    width: 120px;
+}
+
+.details {
+    display: flex;
+    justify-content: space-between;
+}
+
+#pills-tab {
+    position: relative;
+}
