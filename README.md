@@ -153,3 +153,28 @@ export const environment = {
   apiUrl: 'http://192.168.0.3:8081',
 };
 ```
+
+## Docker Compose
+
+Crearemos el archivo `docker-compose.yml` en el mismo nivel que el archivo `Dockerfile`:
+
+````yaml
+services:
+  angular-docker:
+    container_name: angular-docker-app-container
+    build: .
+    image: angular-docker:v1
+    ports:
+      - 80:80
+    expose:
+      - 80
+    networks:
+      - internal-net
+
+networks:
+  internal-net:
+    driver: bridge
+````
+
+El `Dockerfile` se encuentra en el mismo nivel que el `docker-compose.yml`, eso representa el punto (.), el directorio actual.
+
