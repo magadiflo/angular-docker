@@ -1,0 +1,15 @@
+services:
+  angular-docker:
+    container_name: angular-docker-app-container
+    build: .
+    image: angular-docker:v1
+    ports:
+      - 80:80
+    expose:
+      - 80
+    networks:
+      - internal-net
+
+networks:
+  internal-net:
+    driver: bridge
