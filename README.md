@@ -178,3 +178,91 @@ networks:
 
 El `Dockerfile` se encuentra en el mismo nivel que el `docker-compose.yml`, eso representa el punto (.), el directorio actual.
 
+## Running Container
+
+Para correr la aplicación con docker compose debemos posicionarnos en la raíz del proyecto mediante la línea de comandos. En esta raíz es donde precisamente se encuentran el `Dockerfile` y `docker-compose.yml`.
+
+````bash
+docker-compose up -d --build
+````
+
+**DONDE**  
+Fuente: [Laiba Razi Khan](https://laiba.hashnode.dev/docker-compose-up-build)
+
+- `docker-compose up`, este subcomando se utiliza para crear y ejecutar contenedores para una aplicación definida en el archivo `docker-compose.yml`. Si los contenedores ya existen, este comando los iniciará si están detenidos.
+- `-d` o `--detach`, este argumento opcional **indica a Docker Compose que ejecute los contenedores en segundo plano**, lo que significa que no verás la salida de registro en la terminal en tiempo real. Esto es útil para ejecutar contenedores en segundo plano y seguir utilizando la terminal para otros comandos.
+- `--build`, este argumento **indica a Docker Compose que construya las imágenes de Docker si no existen o si han cambiado desde la última construcción.** Esto es útil cuando has realizado cambios en el código fuente de tus aplicaciones y necesitas reconstruir las imágenes antes de iniciar los contenedores.
+
+Como resultado, vemos que se crea todo correctamente e inicia nuestro contenedor:
+
+![docker compose](./imagenes/docker-compose.png)
+
+Listamos todos los `contenedores` que tenemos en nuestro `Docker` y vemos que dentro de ellos está nuestro contenedor de angular recién creado:
+
+````bash
+docker container ls -a
+
+CONTAINER ID   IMAGE                    COMMAND                  CREATED              STATUS                      PORTS                NAMES
+7058eca9acd3   angular-docker:v1        "/docker-entrypoint.…"   About a minute ago   Up About a minute           0.0.0.0:80->80/tcp   angular-docker-app-container
+aae6ec2554bd   spring-boot-docker:dev   "java -jar app.jar"      4 weeks ago          Exited (143) 23 hours ago                        app-container-dev
+````
+
+Podemos entrar a ver el log dentro de nuestro contenedor de angular:
+
+````bash
+docker logs angular-docker-app-container
+
+/docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+/docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+/docker-entrypoint.sh: Configuration complete; ready for start up
+2023/09/12 15:20:50 [notice] 1#1: using the "epoll" event method
+2023/09/12 15:20:50 [notice] 1#1: nginx/1.24.0
+2023/09/12 15:20:50 [notice] 1#1: built by gcc 10.2.1 20210110 (Debian 10.2.1-6)
+2023/09/12 15:20:50 [notice] 1#1: OS: Linux 5.15.49-linuxkit-pr
+2023/09/12 15:20:50 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+2023/09/12 15:20:50 [notice] 1#1: start worker processes
+2023/09/12 15:20:50 [notice] 1#1: start worker process 29
+2023/09/12 15:20:50 [notice] 1#1: start worker process 30
+2023/09/12 15:20:50 [notice] 1#1: start worker process 31
+2023/09/12 15:20:50 [notice] 1#1: start worker process 32
+````
+
+Como todo está funcionando correctamente, **en nuestra pc local ingresamos por el navegador a nuestra aplicación de angular** que está dentro del contenedor de Docker.  
+
+Recordemos que **configuramos el puerto externo de nuestro contenedor en el 80**, que es el mismo puerto que documentamos como un puerto expuesto (expose):
+
+![aplicación angular en contenedor](./imagenes/angular-app-funcionando.png)
+
+**IMPORTANTE**
+
+- Si **no colocamos el puerto** en la url `http://192.168.0.3`, por defecto será el puerto `80`.
+- Debemos utilizar la dirección **ip de nuestra pc local** `192.168.0.3`, que es donde está instalado `Docker` y cuyo puerto que expone el contenedor es el `80`. En otras palabras, para poder acceder al contenedor, necesitamos usar la dirección ip donde se encuentra y el puerto que expone.
+- Como estamos accediendo a nuestra aplicación de angular a través de la dirección ip de nuestra pc local `http://192.168.0.3` con puerto predeterminado `80`, es importante **habilitar el cors en el backend para esta dirección**, sino el navegador nos bloqueará por esa política de cors:
+
+  ````bash
+  Access to XMLHttpRequest at 'http://192.168.0.3:8081/user/login' from origin 'http://192.168.0.3' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.      
+  POST http://192.168.0.3:8081/user/login net::ERR_FAILED
+  ````
+  Habilitando en el backend la dirección ip de origen `http://192.168.0.3`. Note que también tenemos la dirección con la que trabajamos localmente nuestra aplicación de Angular antes de realizar todo el proceso de dockerización `localhost:4200`:
+
+  ````java
+  @Bean
+	public CorsFilter corsFilter() {
+		UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
+		CorsConfiguration corsConfiguration = new CorsConfiguration();
+    /* other configurations */
+		corsConfiguration.setAllowedOrigins(Arrays.asList("http://localhost:4200", "http://192.168.0.3"));
+		/* other configurations */
+		return new CorsFilter(urlBasedCorsConfigurationSource);
+	}
+  ````
+
+Ahora sí, nos registramos, obtenemos un password, iniciamos sesión y veremos algo similar:
+
+![angular-app-funcionando-app](./imagenes/angular-app-funcionando-app.png)
+

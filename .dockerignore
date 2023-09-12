@@ -9,3 +9,5 @@
 **/.editorconfig
 **/.aws
 **/dist
+## Las imágenes que agregamos al README
+**/imagenes
