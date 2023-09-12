@@ -266,3 +266,87 @@ Ahora sí, nos registramos, obtenemos un password, iniciamos sesión y veremos a
 
 ![angular-app-funcionando-app](./imagenes/angular-app-funcionando-app.png)
 
+## Fixing 404 Not Found
+
+En el ejemplo anterior vimos que pudimos llegar hasta la url `http://192.168.0.3/user/management`. Ahora, **¿qué pasa si actualizamos la página (F5)?**:
+
+![404 not found](./imagenes/404-not-found.png)
+
+Vemos que se rompió nuestra aplicación, **¿por qué sucede eso?** es porque cuando hacemos una actualización **(F5)** el **servidor web Nginx** entiende que se tiene que hacer una petición al backend con la url que se colocó `/user/management`, precisamente eso es lo que observamos en el log del navegador: `GET http://192.168.0.3/user/management 404 (Not Found)` y obviamente fallará ya que nosotros no estamos trabajando con esa ruta en el backend, esa ruta corresponde a la administración de la navegación de nuestra aplicación de angular, es decir, Angular mira esa ruta y luego decide qué componente mostrar, pero no está funcionando.
+
+Para solucionar ese error, lo que haremos será **servir siempre el archivo index.html** sin importar la ruta que se proporcione en la url. Es decir, cuando ingresamos a la raíz de la página `http://192.168.0.3` lo que hace el navegador es solicitar el archivo `index.html` que se tiene en el servidor Nginx, que es realmente el único archivo `html` que tenemos en el servidor, por esa razón es que en las imágenes anteriores pudimos realizar la navegación sin problemas, pero siempre partiendo desde la raíz.
+
+Entonces, desde la terminal debemos **ingresar al contenedor:**
+
+````bash
+docker exec -it angular-docker-app-container /bin/bash
+````
+Una vez dentro del contenedor debemos instalar un editor para poder abrir los archivos de configuración y poder editarlos, así que **ejecutamos dentro del contenedor los siguientes comandos:**
+
+````bash
+apt update
+````
+
+````bash
+apt install vim
+````
+
+Nos iremos a la siguiente dirección `/etc/nginx` y listaremos todos los archivos y directorios, veremos que existe uno llamado `nginx.conf`, lo abrimos para ver su contenido usando el siguiente comando:
+
+````bash
+vim nginx.conf
+````
+
+Si nos vamos a la parte inferior veremos que se incluye todo lo que está en el directorio `include /etc/nginx/conf.d/*.conf;` y termina en .conf. Todo lo que incluyamos en el directorio `/etc/nginx/conf.d/` y termine el archivo en `.conf` se incluirá en el archivo `nginx.conf` eso significa que **no tenemos por qué tocar ese archivo directamente**, es decir, podemos pero no deberíamos ya que nos están dando la posibilidad de agregarlo dentro del directorio `/conf.d`. Ahora, si vamos al directorio `/conf.d` veremos que tenemos el archivo `default.conf`, que según la configuración del include, este archivo se estaría incluyendo en el archivo `nginx.conf`. Por lo tanto, será ese archivo el que finalmente modificaremos para solucionar el error del **404 Not Found**.
+
+Para **salir el archivo que hemos abierto con vim** escribir `:q + enter`
+
+Ubicados en la ruta `/etc/nginx/conf.d` abrimos el archivo `default.conf` con el siguiente comando: 
+
+````bash
+root@7058eca9acd3:/etc/nginx/conf.d# vim default.conf
+````
+
+Presionamos `i` (insertar) para poder editar el archivo vía terminal, nos dirigimos a la opción `location` y agregamos `try_files $uri /index.html;`, finalmente esa sección debe quedar de esta manera:
+
+````
+server {
+  /* más configuraciones */
+
+  location / {
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+    try_files $uri /index.html; <--- Solo agregamos esta configuración
+  }
+
+  /* más configuraciones */
+}
+````
+
+Para salir de la edición del archivo debemos presionar `Esc`, a continuación debemos guardar o hacer write de nuestro cambio, para eso presionamos `:w + enter`
+
+La directiva `try_files` que usamos en la configuración se usa comunmente en nuestro servidor `Nginx` para definir cómo debe manejarse el procesamiento de solicitudes de archivos que no existen en el servidor. 
+
+A continuación, desglosaré lo que significa esta línea específica:
+
+````bash
+try_files $uri /index.html;
+````
+
+- `try_files`: Es la directiva principal que especifica **cómo Nginx debe intentar manejar las solicitudes de archivos que no existen.**
+- `$uri`: Esta variable se sustituirá por la URI (Uniform Resource Identifier) de la solicitud actual. En otras palabras, **representará la ruta de la URL que el cliente está solicitando.**
+- `/index.html`: Esta es la ruta relativa al directorio raíz del servidor donde se buscará el archivo si la URI solicitada no coincide con un archivo existente en el servidor. En este caso, si la solicitud no coincide con ningún archivo en el servidor, Nginx intentará servir el archivo index.html.
+
+
+Entonces, en resumen, esta configuración de try_files indica que cuando alguien solicite un recurso que no existe en el servidor, Nginx intentará servir el archivo index.html en su lugar. Esto es comúnmente utilizado en aplicaciones de una sola página (SPA) o en enrutadores front-end para asegurarse de que todas las solicitudes (por ejemplo, para rutas específicas en una aplicación web) se dirijan a la página principal (index.html) y la lógica de la aplicación maneje la representación de la página en función de la ruta solicitada.
+
+Listo, salimos del contenedor y lo reiniciamos:
+
+````bash
+docker container restart angular-docker-app-container
+````
+
+Ahora volvemos a nuestra página, y refrescamos (F5) la ruta `/user/management` y vemos que ya no nos muestra el `error 404`, hemos solucionado el problema:
+
+![Solución al error 404](./imagenes/fixed-404.png)
+
