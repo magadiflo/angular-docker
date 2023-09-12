@@ -36,7 +36,7 @@ RUN npm run build
 
 # Segunda etapa
 FROM nginx:stable
-COPY --from=build /app/angular-docker /usr/share/nginx/html
+COPY --from=build /app/dist/angular-docker /usr/share/nginx/html
 EXPOSE 80
 ````
 
@@ -59,7 +59,7 @@ EXPOSE 80
 ### Segunda etapa: Contruyendo imagen
 
 - `FROM nginx:stable`, en esta segunda etapa le diremos que utilizaremos la imagen del servidor web `nginx` cuya versión será la `stable`.
-- `COPY --from=build /app/angular-docker /usr/share/nginx/html`, le decimos que copie desde la etapa anterior `build` (por eso fue importante definirle el alias) todo lo que tenga en su directorio `/app/angular-docker`, que es el resultado precisamente de toda la etapa `build`, que lo copie en el directorio de `/usr/share/nginx/html` que corresponde a esta nueva imagen base (nginx:stable). En resumen, el resultado de la etapa `build` lo copiaremos dentro del directorio del servidor de `nginx` donde ser sirven los archivos estáticos.
+- `COPY --from=build /app/dist/angular-docker /usr/share/nginx/html`, le decimos que copie desde la etapa anterior `build` (por eso fue importante definirle el alias) todo lo que tenga en su directorio `/app/dist/angular-docker`, que es el resultado precisamente de toda la etapa `build`, que lo copie en el directorio de `/usr/share/nginx/html` que corresponde a esta nueva imagen base (nginx:stable). En resumen, el resultado de la etapa `build` lo copiaremos dentro del directorio del servidor de `nginx` donde ser sirven los archivos estáticos.
 - `EXPOSE 80`, exponemos el puerto donde estará trabajando nuestra aplicación.
 
 **NOTA**
@@ -87,3 +87,54 @@ A continuación mostramos todas las rutas y directorios que ignoraremos. Como es
 **/.aws
 **/dist
 ````
+
+## Compilando para el despliegue
+
+En esta sección veremos qué archivos y directorios se generan cuando compilamos nuestro proyecto de Angular utilizando la CLI. El resultado de esto será lo mismo que se obtenga como resultado en la `primera etapa` del archivo `Dockerfile`. Aquí solo ejecutamos el `ng build` para poder ver qué archivos y directorios son creados:
+
+````
+|/dist/angular-docker/
+|--/assets/image/angular.png
+|--3rdpartylicenses.txt
+|--favicon.ico
+|--index.html
+|--main.00f6a413b2f8c76d.js
+|--polyfills.16fa819a51a21985.js
+|--runtime.7a1e3d808ae4a804.js
+|--scripts.abbb37f329463b12.js
+|--styles.6f5074d0b0d22170.css
+````
+
+Listo, luego de ejecutar el `ng build` con el CLI de Angular, veremos que en nuestro proyecto local hay un directorio `/dist` y dentro de él nuestro proyecto compilado.
+
+Ahora, en el archivo `package.json` tenemos el apartado de los `scripts` que a continuación lo muestro:
+
+````json
+{
+  "scripts": {
+      "ng": "ng",
+      "start": "ng serve",
+      "build": "ng build",
+      "watch": "ng build --watch --configuration development",
+      "test": "ng test"
+    }  
+}
+````
+
+Como observamos el script `watch` utiliza una bandera con un valor `--configuration development`, podemos usar esa misma idea para agregarlo en nuestro script `build` (script que se  usará en el archivo Dockerfile, primera etapa), de modo que ahora tendremos de esta manera nuestra configuración:
+
+````json
+{
+  "scripts": {
+      "ng": "ng",
+      "start": "ng serve",
+      "build": "ng build --configuration production",
+      "watch": "ng build --watch --configuration development",
+      "test": "ng test"
+    }  
+}
+````
+
+Como observamos, ahora en nuestro script `build` agregamos la bandera `--configuration` y su valor `production`, aunque en realidad **puede tener cualquier nombre**, no necesariamente debe llamarse `production`. 
+
+Más adelante mostraremos **cómo lo usaremos en un entorno**, porque podemos tener diferentes entornos cada vez que creamos la aplicación (production, development, etc.). **En angular puede cambiar diferentes archivos de entorno** y luego aplicar las propiedades de estos archivos cada vez que ejecute la aplicación en un entorno específico.
