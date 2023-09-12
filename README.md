@@ -350,3 +350,84 @@ Ahora volvemos a nuestra página, y refrescamos (F5) la ruta `/user/management` 
 
 ![Solución al error 404](./imagenes/fixed-404.png)
 
+## Nginx Configuration
+
+En la sección anterior solucionamos el error `404 Not Found` donde tuvimos que ingresar al contenedor y agregar una configuración al archivo `default.conf`. 
+
+Ahora, realizar constantemente todo ese proceso resulta mucho trabajo, así que en esta sección veremos una forma sencilla de evitar realizar todo ese proceso.
+
+Antes de continuar dejaremos limpio todo, detendremos contenedores y redes, ejecutando el comando `docker-compose down`:
+
+````bash
+docker-compose down
+[+] Running 2/1
+✔ Container angular-docker-app-container       Removed
+✔ Network angular-docker_internal-net          Removed
+````
+
+También eliminamos la imagen, es importante colocarle con su tag para que sepamos exactamente qué imagen eliminar:
+
+````bash
+docker image rmi angular-docker:v1
+````
+
+Ahora lo que haremos será **crear en la raíz de nuestro proyecto de angular** el archivo `default.conf` que como vimos en la sección anterior, este archivo contendrá la modificación que le haremos al servidor Nginx para que no ocurra el error `404 Not Found`. 
+
+Luego de crear nuestro archivo, el contenido del archivo original **(previamente copiado del default.conf del contenedor)** lo pegaremos en nuestro archivo `default.conf` que creamos en la raíz de nuestro proyecto de angular y le agregaremos la configuración que hicimos en la sección anterior `try_files $uri /index.html;`. Veamos cómo quedaría nuestro archivo `default.conf`:
+
+````conf
+server {
+  listen               80;
+  listen          [::]:80;
+  server_name   localhost;
+
+  location / {
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+    try_files $uri /index.html; <--- Esta es la configuración que le agregamos
+  }
+
+  error_page  500 502 503 504 /50x.html;
+  location = /50x.html {
+    root   /usr/share/nginx/html;
+  }
+
+}
+````
+
+Finalmente debemos hacer una modificación en nuestro `Dockerfile`, debemos agregarle la siguiente instrucción:
+
+````Dockerfile
+COPY default.conf /etc/nginx/conf.d
+````
+
+Con la instrucción anterior le estamos diciendo al Dockerfile que copie el archivo que está en nuestra raíz de nuestro proyecto angular `default.conf` y lo pegue en el directorio `/etc/nginx/conf.d`, de esta manera reemplazará el archivo original por el nuevo archivo que contiene nuestra configuración adicional.
+
+Finalmente nuestro `Dockerfile` se verá de esta manera:
+
+````dockerfile
+FROM node:18.17.1-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+RUN npx ngcc --properties es2023 browser module main --first-only --create-ivy-entry-points
+COPY . .
+RUN npm run build
+
+FROM nginx:stable
+COPY default.conf /etc/nginx/conf.d
+COPY --from=build /app/dist/angular-docker /usr/share/nginx/html
+EXPOSE 80
+````
+
+Procedemos a continuación ejecutar nuestro docker-compose para iniciar nuestro proyecto:
+
+````bash
+docker-compose up -d --build
+````
+
+Si ahora ingresamos dentro del contenedor y observamos el contenido del archivo `default.conf` veremos que está nuestra configuración:
+
+![configuración](./imagenes/configuracion.png)
+
+Y si ahora ingresamos a nuestra aplicación por la url `http://192.168.0.3` veremos que sigue funcionando correctamente, incluso si recarcamos la página `(F5)` la aplicación sigue funcionando.
